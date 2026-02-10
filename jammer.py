@@ -4,7 +4,7 @@ import plotly.graph_objs as obj_go ##Libs for plotting
 import plotly.graph_objects as go
 
 
-class jammer:
+class Jammer:
     def __init__(self, name, position: npt.NDArray[np.floating], tx_power = 0, colour='red',):
         """
         Docstring for __init__

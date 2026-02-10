@@ -5,7 +5,7 @@ import plotly.graph_objs as obj_go
 import plotly.graph_objects as go
 
 
-class ground_station:
+class Ground_station:
     def __init__(self, name, position: npt.NDArray[np.floating], tx_power = 0, colour='green',):
         """
         Docstring for __init__

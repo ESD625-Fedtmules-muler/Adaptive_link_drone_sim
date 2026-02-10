@@ -6,16 +6,22 @@ import numpy.typing as npt
 import plotly.graph_objects as go
 import plotly.io as pio
 
-class drone:
+from jammer import Jammer
+from ground_station import Ground_station
+
+class Drone:
     def __init__(self, name: str, filename: str, loop=True):
-        
         self.name = name
         self.path_foler = "./paths/"
         self.loop = loop #if the path just should repeat itself.
         self.t_lookup, self.pos_lookup = self._parse_path(filename) ##Konstruere vores lister med
         self.colour = "red"
         self.antenna_direction = npt.NDArray[np.floating]
+        self.pos = np.array([0,0,0])
         pass
+
+
+
     def _parse_path(self, filename: str):
         if (type(filename) is None):
             log.error(f"{self.name}:, No path was given assuming 1")
@@ -31,7 +37,36 @@ class drone:
                 
         return data["time"], pos
 
-    
+
+    def _project_vectors(self, vec1, vec2):
+        
+        #Normaliser vektor 1
+        vec1 = vec1 / np.linalg.norm(vec1)
+
+        #vec1 svarer til forward
+        world_up = np.array([0.0, 0.0, 1.0])
+        #  vec1 næsten parallel med up er noget lort
+        if abs(np.dot(vec1, world_up)) > 0.99:
+            world_up = np.array([0.0, 1.0, 0.0])
+
+        right = np.cross(world_up, vec1) / np.linalg.norm(np.cross(world_up, vec1))
+
+
+        up = np.cross(vec1, right)
+        up /= np.linalg.norm(up)
+
+        # World → vec1 local
+        R_mat = np.vstack((vec1, right, up))
+        vec2_t = R_mat @ vec2   #Skulle eftersigende være matrixmultiplikation
+
+
+        euler = np.array([
+            np.arctan2(vec2_t[1], vec2_t[0]),                       # yaw / heading
+            np.arctan2(vec2_t[2], np.sqrt(vec2_t[0]**2 + vec2_t[1]**2))  # pitch
+        ])
+        return euler
+
+
     def get_radiation(angle: npt.NDArray[np.floating]) -> float:
         """
         Docstring for get_radiation
@@ -46,7 +81,7 @@ class drone:
         return np.cos(angle[0]/2)**2*np.cos(angle[0]/2)**2 #ah yes, direktionel antenna
     
 
-    def get_position(self, t) -> npt.NDArray[np.floating]:
+    def propagate_position(self, t) -> npt.NDArray[np.floating]:
         if self.loop: #if we need to loop around
             t = t % np.max(self.t_lookup)
             idx_1 = np.searchsorted(self.t_lookup, t, side="right") - 1
@@ -64,37 +99,47 @@ class drone:
         if(t_1 == t_2):
             raise Exception("Time is not relativistic in this simulation, a done can only be in one position at one time") 
         alpha = (t-t_1) / (t_2 -t_1)
-        pos = alpha*self.pos_lookup[idx_2] + (1-alpha)*self.pos_lookup[idx_1]
-        return pos  ##Linear interpolate between the two points
+        self.lastpos = self.pos
+        self.pos = alpha*self.pos_lookup[idx_2] + (1-alpha)*self.pos_lookup[idx_1]
+        
+        return self.pos  ##Linear interpolate between the two points
 
 
     def get_direction(self, t):
-        if self.loop: #if we need to loop around
-            t = t % np.max(self.t_lookup)
-            idx_1 = np.searchsorted(self.t_lookup, t, side="right") - 1
-            idx_1 = max(idx_1, 0)
-            idx_2 = (idx_1 + 1) % len(self.t_lookup) ## Next index 
-        else: 
-            #TODO Der lidt skald der skal fikses her, tror den dør og dividerer med nul.. hvis man når enden af listen uden  
-            idx_1 = np.searchsorted(self.t_lookup, t, side="right") - 1 
-            idx_1 = max(idx_1, 0)
-            idx_2 = np.min((idx_1 + 1), len(self.t_lookup)-1) ## Så finder index 2, hvis det uden for arrayet så smider vi det sidste index med. 
-
-        
-        direction_vector = self.pos_lookup[idx_2] - self.pos_lookup[idx_1]
-        
+        direction_vector = self.pos - self.lastpos
         return np.divide(direction_vector, np.linalg.norm(direction_vector))
     
-    def probe_direction(self, target_pos):
+
+
+
+    def probe_direction(self, target, jammers: None | list[Jammer] = None, drones: None | list= None):
         """
         Docstring for probe_direction
         
         :param self: Description
         :param target: Description
+        :param jammers: Description
+        :type jammers: None | list[Jammer]
+        :param drones: Description
+        :type drones: None | list[Drone]
         """
 
 
-    
+        dir_Vector = (target.get_position() - self.pos) ##giver os retningsvektoren fra os til le' target
+        dir_euler = self._project_vectors(dir_Vector, dir_Vector) ##I og for sig rigtig meget en vektor som helst sku gi 0,0 i grader 
+        G_s_rx = self.get_radiation(dir_euler) #Reciever 
+        G_s_tx =
+        
+        if type(jammers) != None:
+            for jammer in jammers:
+                jammer.pos - self.pos
+
+            
+        
+
+
+
+
     
     def render(self, t):
         pos = self.get_position(t)
@@ -140,8 +185,10 @@ if __name__ == "__main__":
     pio.renderers.default = "browser"
 
 
-    drone_hans = drone("drone: 1", "testpath1.csv")
-    drone_hans2 = drone("drone: 2", "happy_path.csv")
+    drone_hans = Drone("drone: 1", "testpath1.csv")
+    drone_hans2 = Drone("drone: 2", "happy_path.csv")
+
+    print(drone_hans._project_vectors(np.array([0,1,0]), np.array([0,1,0])))
 
     x,y,z  = [],[],[]
     time = np.linspace(0, 24, 400)
@@ -165,9 +212,6 @@ if __name__ == "__main__":
     fig.add_traces(drone_hans.render(12))
     
     fig.update_layout(
-        scene=dict(
-            aspectmode='data'
-        )
+        scene=dict(aspectmode='data')
     )
     fig.show()
-
