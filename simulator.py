@@ -1,23 +1,69 @@
-import numpy
+import numpy as np
 import plotly.graph_objs as obj_go ##Libs for plotting
 import plotly.graph_objects as go
 from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
 import time
 
-from drone import drone
+
+
+##Vores simulations-objekter
+from drone import Drone
+from jammer import Jammer
+from ground_station import Ground_station
+
+
+
 
 class simulation:
 
-    def __init__(self):
-
+    def __init__(self, drones: list[Drone] | None, jammers: list[Jammer] | None, ground_stations: list[Ground_station] | None):
+        self.drones = drones
+        self.jammers = jammers
+        self.ground_stations = ground_stations
         pass
 
 
+    def update_positions(self, t):
+        for drone in drones:
+            drone.propagate_position(t)
+        
+    def render_units(self, fig: go.Figure):
+        for drone in drones:
+            fig.add_traces(drone.render())
+    
+    def evaluate_links(self):
+        for drone in drones:
+            
 
-drone1 = drone("hans", "testpath1.csv")
-drone2 = drone("holger", "happy_path.csv")
-drone3 = drone("poul", "happy_path2.csv")
+
+
+
+
+
+
+
+
+drones = [ 
+    Drone("hans", "testpath1.csv"),
+    Drone("holger", "happy_path.csv"),
+    Drone("poul", "happy_path2.csv")
+]
+
+jammers = [
+    Jammer("Vlad",          np.array(([20, -10, 0.5]))),
+    Jammer("Stanislav",     np.array(([20,   0, 0.5]))),
+    Jammer("J.D. Vance",    np.array(([20,  10, 0.5])))
+]
+
+ground_stations = [
+    Ground_station("Poul",  np.array([-20, -10, 0.5])),
+    Ground_station("8700",  np.array([-20,   0, 0.5])),
+    Ground_station("pingo", np.array([-20,  10, 0.5]))
+]
+
+
+
 
 
 t_start = time.time()
@@ -43,11 +89,13 @@ app.layout = html.Div(
 
 def update(n):
     t_now = time.time()-t_start
-    
-    
-    
-    
     fig = go.Figure()
+
+
+    
+    
+    
+    
     fig.add_traces(drone1.render(t_now))
     fig.add_traces(drone2.render(t_now))
     fig.add_traces(drone3.render(t_now))
@@ -65,4 +113,6 @@ def update(n):
     return fig
 
 if __name__ == "__main__":
+
+    
     app.run(debug=True)

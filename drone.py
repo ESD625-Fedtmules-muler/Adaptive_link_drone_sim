@@ -8,6 +8,8 @@ import plotly.io as pio
 
 from jammer import Jammer
 from ground_station import Ground_station
+from __future__ import annotations
+
 
 class Drone:
     def __init__(self, name: str, filename: str, loop=True):
@@ -105,17 +107,20 @@ class Drone:
         return self.pos  ##Linear interpolate between the two points
 
 
-    def get_direction(self, t):
+    def get_direction(self):
         direction_vector = self.pos - self.lastpos
         return np.divide(direction_vector, np.linalg.norm(direction_vector))
     
 
 
 
-    def probe_direction(self, target, jammers: None | list[Jammer] = None, drones: None | list= None):
+    def probe_direction(self, 
+                        target: Drone | Ground_station, 
+                        jammers: None | list[Jammer] = None, 
+                        drones: None | list[Drone] = None
+                        ):
         """
         Docstring for probe_direction
-        
         :param self: Description
         :param target: Description
         :param jammers: Description
@@ -125,20 +130,38 @@ class Drone:
         """
 
 
-        dir_Vector = (target.get_position() - self.pos) ##giver os retningsvektoren fra os til le' target
-        dir_euler = self._project_vectors(dir_Vector, dir_Vector) ##I og for sig rigtig meget en vektor som helst sku gi 0,0 i grader 
+        dir_target = (target.get_position() - self.pos) ##giver os retningsvektoren fra os til le' target
+        dir_euler = self._project_vectors(dir_target, dir_target) ##I og for sig rigtig meget en vektor som helst sku gi 0,0 i grader 
         G_s_rx = self.get_radiation(dir_euler) #Reciever 
-        G_s_tx =
+        P_EIRP_tx = target.get_power() ##Assumer at target transmitter med 1.
+        P_s = self._fspl(G_s_rx, P_EIRP_tx, np.linalg.norm(dir_target))
         
+        P_n = 0
+
         if type(jammers) != None:
             for jammer in jammers:
-                jammer.pos - self.pos
-
-            
+                dir_jammer = jammer.get_position() - self.pos
+                P_EIRP_tx = jammer.get_power()
+                G_s_rx = self.get_radiation(self._project_vectors(dir_target, dir_jammer))
+                P_n += self._fspl(G_s_rx, P_EIRP_tx, np.linalg.norm(dir_jammer))
         
+        return P_s, P_n    
 
 
 
+    def _fspl(self, G_rx, P_tx, distance) -> float:
+        """
+        Docstring for _fspl
+        
+        :param self: Description
+        :param G_rx: Lineart gain, skal regnes fra dbi
+        :param P_tx: Lineart, af Gain og txpower.
+        :param distance: afstand i meter
+        Gang selv
+        """
+        lbda = 0.12491352 # meter
+        
+        return ((lbda)/(4*np.pi*distance))**2 * G_rx * P_tx
 
     
     def render(self, t):

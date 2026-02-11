@@ -20,10 +20,10 @@ class Jammer:
         self.colour = colour
         pass
 
-    def get_position(self, t) -> npt.NDArray[np.floating]:
+    def get_position(self) -> npt.NDArray[np.floating]:
         return self.position
     
-    def get_power(self):
+    def get_power(self) -> float:
         return self.tx_power
 
     def render(self, t) -> go.Scatter3d:

@@ -23,13 +23,13 @@ class Ground_station:
 
     
 
-    def get_position(self, t):
+    def get_position(self):
         pass
     
 
     
 
-    def render(self, t) -> go.Scatter3d:
+    def render(self) -> go.Scatter3d:
         return go.Scatter3d(
             x=[self.position[0]],
             y=[self.position[1]],
@@ -56,10 +56,10 @@ if __name__ == "__main__":
 
 
     stations = [
-        ground_station("Test1", np.array([0,0,0])),
-        ground_station("Test2", np.array([1,0,0])),        
-        ground_station("Test3", np.array([3,8,0])),        
-        ground_station("Test4", np.array([0,4,0]))     
+        Ground_station("Test1", np.array([0,0,0])),
+        Ground_station("Test2", np.array([1,0,0])),        
+        Ground_station("Test3", np.array([3,8,0])),        
+        Ground_station("Test4", np.array([0,4,0]))     
     ]
 
 
