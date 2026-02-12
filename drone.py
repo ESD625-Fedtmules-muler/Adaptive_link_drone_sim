@@ -1,3 +1,4 @@
+from __future__ import annotations
 import numpy as np
 import pandas as pd
 import logging as log
@@ -6,9 +7,13 @@ import numpy.typing as npt
 import plotly.graph_objects as go
 import plotly.io as pio
 
-from jammer import Jammer
-from ground_station import Ground_station
-from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ground_station import Ground_station
+    from jammer import Jammer
+
+
 
 
 class Drone:
@@ -20,6 +25,8 @@ class Drone:
         self.colour = "red"
         self.antenna_direction = npt.NDArray[np.floating]
         self.pos = np.array([0,0,0])
+        self.tx_power = 0.1
+        self.noise_floor = 10**(-110/10)*0.001
         pass
 
 
@@ -43,7 +50,10 @@ class Drone:
     def _project_vectors(self, vec1, vec2):
         
         #Normaliser vektor 1
-        vec1 = vec1 / np.linalg.norm(vec1)
+        if (np.linalg.norm(vec1) == 0):
+            vec1 = np.array([1,0,0])
+        else:
+            vec1 = vec1 / np.linalg.norm(vec1)
 
         #vec1 svarer til forward
         world_up = np.array([0.0, 0.0, 1.0])
@@ -69,7 +79,7 @@ class Drone:
         return euler
 
 
-    def get_radiation(angle: npt.NDArray[np.floating]) -> float:
+    def get_radiation(self, angle: npt.NDArray[np.floating]) -> float:
         """
         Docstring for get_radiation
         
@@ -80,7 +90,7 @@ class Drone:
         """
 
         
-        return np.cos(angle[0]/2)**2*np.cos(angle[0]/2)**2 #ah yes, direktionel antenna
+        return (np.cos(angle[0]/2)**10)* (np.cos(angle[1]/2)**10) #ah yes, direktionel antenna
     
 
     def propagate_position(self, t) -> npt.NDArray[np.floating]:
@@ -106,19 +116,37 @@ class Drone:
         
         return self.pos  ##Linear interpolate between the two points
 
+    def get_position(self) -> npt.NDArray[np.floating]:
+        """
+        Gives the current position vector for the drone
+        
+        :return: Description
+        :rtype: NDArray[floating]
+        """
+        return self.pos  ##Linear interpolate between the two points
+
 
     def get_direction(self):
         direction_vector = self.pos - self.lastpos
-        return np.divide(direction_vector, np.linalg.norm(direction_vector))
-    
+        if np.linalg.norm(direction_vector) < 0.001:
+            return np.array([1,0,0]) #Så lille retning ikke giver mening
 
+        return np.divide(direction_vector, np.linalg.norm(direction_vector))
+
+    
+    def get_power(self, angle: npt.NDArray[np.floating] | None = None) -> float:
+        if angle == None:
+            return self.tx_power
+        else:
+            return self.get_radiation(angle) * self.tx_power
+        
 
 
     def probe_direction(self, 
                         target: Drone | Ground_station, 
                         jammers: None | list[Jammer] = None, 
                         drones: None | list[Drone] = None
-                        ):
+                        ) -> list[float, float]:
         """
         Docstring for probe_direction
         :param self: Description
@@ -145,7 +173,7 @@ class Drone:
                 G_s_rx = self.get_radiation(self._project_vectors(dir_target, dir_jammer))
                 P_n += self._fspl(G_s_rx, P_EIRP_tx, np.linalg.norm(dir_jammer))
         
-        return P_s, P_n    
+        return P_s, P_n + self.noise_floor
 
 
 
@@ -164,9 +192,9 @@ class Drone:
         return ((lbda)/(4*np.pi*distance))**2 * G_rx * P_tx
 
     
-    def render(self, t):
-        pos = self.get_position(t)
-        direction = self.get_direction(t) / 4
+    def render(self):
+        pos = self.pos
+        direction = self.get_direction() / 4
 
 
         line = go.Scatter3d(
@@ -178,8 +206,9 @@ class Drone:
             textposition="top center",
             line=dict(
             width=6,
-            color=self.colour         
+            color=self.colour,         
             ),
+            name = self.name
         )
 
         # pilens spids (cone)
@@ -216,11 +245,11 @@ if __name__ == "__main__":
     x,y,z  = [],[],[]
     time = np.linspace(0, 24, 400)
     for t in time:
-        pos = drone_hans2.get_position(t)
+        pos = drone_hans2.propagate_position(t)
         x.append(pos[0])
         y.append(pos[1])
         z.append(pos[2])
-
+    
 
     fig = go.Figure(
         data=go.Scatter3d(
@@ -232,8 +261,7 @@ if __name__ == "__main__":
         )
     )
 
-    fig.add_traces(drone_hans.render(12))
-    
+    fig.add_traces( drone_hans2.render())
     fig.update_layout(
         scene=dict(aspectmode='data')
     )

@@ -1,7 +1,14 @@
+from __future__ import annotations
 import numpy as np #Geden, numpy.
 import numpy.typing as npt #For at håndtere types, (det gør jeres liv nemmere)
 import plotly.graph_objs as obj_go ##Libs for plotting
 import plotly.graph_objects as go
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ground_station import Ground_station
+    from drone import Drone
 
 
 class Jammer:
@@ -26,7 +33,7 @@ class Jammer:
     def get_power(self) -> float:
         return self.tx_power
 
-    def render(self, t) -> go.Scatter3d:
+    def render(self) -> go.Scatter3d:
         return go.Scatter3d(
             x=[self.position[0]],
             y=[self.position[1]],
