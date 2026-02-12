@@ -229,8 +229,8 @@ def handle_path_coords(links, path):
 
 drones = [ 
     Drone("hans", "backfourth.csv"),
-    #Drone("holger", "happy_path.csv"),
-    #Drone("bongers", "happy_path2.csv"),
+    Drone("holger", "happy_path.csv"),
+    Drone("bongers", "happy_path2.csv"),
     Drone("poul", "left2right.csv")
 ]
 
