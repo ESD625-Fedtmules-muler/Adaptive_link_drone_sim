@@ -27,6 +27,7 @@ class Drone:
         self.pos = np.array([0,0,0])
         self.tx_power = 0.1
         self.noise_floor = 10**(-110/10)*0.001
+
         pass
 
 
@@ -67,7 +68,7 @@ class Drone:
         up = np.cross(vec1, right)
         up /= np.linalg.norm(up)
 
-        # World → vec1 local
+        # World => vec1 local
         R_mat = np.vstack((vec1, right, up))
         vec2_t = R_mat @ vec2   #Skulle eftersigende være matrixmultiplikation
 
@@ -88,10 +89,9 @@ class Drone:
         :return: A real float with the absolute magnitude radiation NOT dB
         :rtype: float
         """
-
         
-        return (np.cos(angle[0]/2)**10)* (np.cos(angle[1]/2)**10) #ah yes, direktionel antenna
-    
+        return (np.cos(angle[0]/2)**10)* (np.cos(angle[1]/2)**10) + 0.05#ah yes, direktionel antenna
+
 
     def propagate_position(self, t) -> npt.NDArray[np.floating]:
         if self.loop: #if we need to loop around
@@ -228,8 +228,6 @@ class Drone:
         return [line, cone]
 
 
-
-    
 
 
 if __name__ == "__main__":
