@@ -38,6 +38,9 @@ class Drone:
             return ([0], np.array([1,1,1])) 
 
         data = pd.read_csv(self.path_foler + filename)
+        data.columns = data.columns.str.strip()
+
+
         pos = np.transpose(np.array([
             data["x"],
             data["y"],
@@ -235,15 +238,14 @@ if __name__ == "__main__":
     pio.renderers.default = "browser"
 
 
-    drone_hans = Drone("drone: 1", "testpath1.csv")
-    drone_hans2 = Drone("drone: 2", "happy_path.csv")
+    drone_hans = Drone("drone: 1", "reference_path.csv")
 
     print(drone_hans._project_vectors(np.array([0,1,0]), np.array([0,1,0])))
 
     x,y,z  = [],[],[]
-    time = np.linspace(0, 24, 400)
+    time = np.linspace(0, 326, 1000)
     for t in time:
-        pos = drone_hans2.propagate_position(t)
+        pos = drone_hans.propagate_position(t)
         x.append(pos[0])
         y.append(pos[1])
         z.append(pos[2])
@@ -259,8 +261,19 @@ if __name__ == "__main__":
         )
     )
 
-    fig.add_traces( drone_hans2.render())
+    fig.add_traces(drone_hans.render())
     fig.update_layout(
-        scene=dict(aspectmode='data')
+        scene=dict(
+            xaxis=dict(range=[min(x), max(x)]),
+            yaxis=dict(range=[min(y), max(y)]),
+            zaxis=dict(range=[min(z), max(z)]),
+
+            aspectmode='manual',
+            aspectratio=dict(
+                x=1,
+                y=1,
+                z=1
+            )
+            )
     )
     fig.show()
