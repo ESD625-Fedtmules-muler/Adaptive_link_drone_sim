@@ -9,6 +9,9 @@ import pandas as pd
 import dash_cytoscape as cyto
 
 
+import matplotlib.pyplot as plt
+
+import seaborn as sns
 ##Vores simulations-objekter
 from drone import Drone
 from jammer import Jammer
@@ -99,7 +102,8 @@ class simulation:
         for jammer in jammers:
             fig.add_traces(jammer.render())
     
-    def evaluate_links(self) -> pd.DataFrame:
+    def evaluate_links(self, noise_floor: float = -110) -> pd.DataFrame:
+        p_n_floor = 10**(noise_floor/10)*0.001
         rssi = []
         snr = []
         rx = []
@@ -123,6 +127,7 @@ class simulation:
         for drone in drones:
             for gs in ground_stations:
                 p_s, p_n = drone.probe_direction(gs, jammers)
+                p_n += p_n_floor
                 rssi.append(p_s + p_n)
                 snr.append(p_s / p_n)
                 rx.append(drone.name)
@@ -133,6 +138,7 @@ class simulation:
         for gs in ground_stations:
             for drone in drones:
                 p_s, p_n = gs.probe_direction(drone, jammers)
+                p_n += p_n_floor
                 rssi.append(p_s + p_n)
                 snr.append(p_s / p_n)
                 rx.append(gs.name)
@@ -337,11 +343,6 @@ app.layout = html.Div(
         dcc.Interval(id="interval", interval=100, n_intervals=0),
     ],
 )
-
-
-
-
-
 @app.callback(
         
     Output("live-graph", "figure"),
@@ -401,19 +402,6 @@ def update(n):
         else:
             i+=1
 
-    #snr_list.append(snr_min)
-    #timestamp.append(t_now)
-    
-    #if (t_now > 40):
-    #    
-    #    df = pd.DataFrame({
-    #        "t" : timestamp,
-    #        "snr" : snr_list
-    #    })
-    #    df.to_csv("snr_w_hopping2.csv")
-    #    while(True):
-    #        pass
-
     if n % 10 == 0:
         print(f"SNR: {10*np.log10(np.abs(snr_min)) :.2f}")
     
@@ -453,9 +441,67 @@ def update(n):
 
 
 
+def assign_random_pos(min_y, rng: np.random.Generator):
+    return np.array([
+        rng.uniform(-1000, 1000),
+        rng.uniform(min_y, 1800+500),
+        2
+    ])
+
+
 
 
 if __name__ == "__main__":
+    #app.run(debug=True)
+    rng = np.random.default_rng(1)
     
-    app.run(debug=True)
+    runs = 300
+    snrd2b = []
+    snrb2d = []
+    final_time = []
+    for run in range(runs):
+        print(f"iterations: {run}/{runs}")
+        jammers = [
+            Jammer("0",     assign_random_pos(1800, rng), 27),
+            Jammer("1",     assign_random_pos(1400, rng), 10),
+            Jammer("2",     assign_random_pos(1400, rng), 10),
+            Jammer("3",     assign_random_pos(1400, rng), 10),
+        ]
 
+
+        drones=[
+            Drone("poul", "reference_path.csv")
+        ]
+
+        ground_stations = [
+            Ground_station("8700", np.array([0,0,2]))
+        ]
+
+        sim = simulation(drones, jammers, ground_stations)
+
+
+        timespan = np.linspace(0, 400, 200)
+
+
+
+        for i, t in enumerate(timespan):
+            sim.update_positions(t)
+            links = sim.evaluate_links()
+            
+            snrb2d.append(10*np.log10(links["snr"][(links["tx"] == "8700") & (links["rx"] == "poul")].iloc[0]))
+            snrd2b.append(10*np.log10(links["snr"][(links["tx"] == "poul") & (links["rx"] == "8700")].iloc[0]))
+            final_time.append(t)
+
+    df = pd.DataFrame()
+    df["time"] = final_time
+    df["d2b"] = snrd2b
+    df["b2d"] = snrb2d
+
+    sns.lineplot(data=df, x="time", y="d2b", label="drone to base", errorbar=("sd", 2))
+    sns.scatterplot(data=df, x="time", y="d2b", label="drone to base", s=1)
+
+    sns.lineplot(data=df, x="time", y="b2d", label="base to drone", errorbar=("sd", 2))
+    sns.scatterplot(data=df, x="time", y="b2d", label="base to drone", s=1)
+    plt.grid(True)
+    plt.show()
+    

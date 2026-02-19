@@ -93,7 +93,7 @@ class Drone:
         :rtype: float
         """
         
-        return (np.cos(angle[0]/2)**10)* (np.cos(angle[1]/2)**10) + 0.05#ah yes, direktionel antenna
+        return 1 #(np.cos(angle[0]/2)**10)* (np.cos(angle[1]/2)**10) + 0.05#ah yes, direktionel antenna
 
 
     def propagate_position(self, t) -> npt.NDArray[np.floating]:
