@@ -236,13 +236,13 @@ drones = [
 
 jammers = [
     #Jammer("Vlad",          np.array(([20, -10, 0.5]))),
-    Jammer("Stanislav",     np.array(([50,   0, 2])), 40)
+    Jammer("Stanislav",     np.array(([0,  1800, 2])), 27)
     #Jammer("J.D. Vance",    np.array(([20,  10, 0.5])))
 ]
 
 ground_stations = [
     #Ground_station("Poul",  np.array([-20, -10, 0.5])),
-    Ground_station("8700",  np.array([-20,   0, 2]))
+    Ground_station("8700",  np.array([0,   0,   2]))
     #Ground_station("pingo", np.array([-20,  10, 0.5]))
 ]
 
