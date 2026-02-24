@@ -441,10 +441,10 @@ def update(n):
 
 
 
-def assign_random_pos(min_y, rng: np.random.Generator):
+def assign_random_pos(max_y, rng: np.random.Generator):
     return np.array([
-        rng.uniform(-1000, 1000),
-        rng.uniform(min_y, 1800+500),
+        rng.uniform(-3000, 200),
+        rng.uniform(-2300, max_y),
         2
     ])
 
@@ -462,10 +462,12 @@ if __name__ == "__main__":
     for run in range(runs):
         print(f"iterations: {run}/{runs}")
         jammers = [
-            Jammer("0",     assign_random_pos(1800, rng), 27),
-            Jammer("1",     assign_random_pos(1400, rng), 10),
-            Jammer("2",     assign_random_pos(1400, rng), 10),
-            Jammer("3",     assign_random_pos(1400, rng), 10),
+            Jammer("0",     assign_random_pos(-2000, rng), 27),
+            Jammer("1",     assign_random_pos(-1800, rng), 10),
+            Jammer("2",     assign_random_pos(-1800, rng), 10),
+            Jammer("3",     assign_random_pos(-1800, rng), 10),
+            Jammer("4",     assign_random_pos(-1800, rng), 10),
+
         ]
 
 
@@ -496,12 +498,18 @@ if __name__ == "__main__":
     df["time"] = final_time
     df["d2b"] = snrd2b
     df["b2d"] = snrb2d
+    df.to_csv("Isotropic_path.csv")
+
+
 
     sns.lineplot(data=df, x="time", y="d2b", label="drone to base", errorbar=("sd", 2))
     sns.scatterplot(data=df, x="time", y="d2b", label="drone to base", s=1)
 
     sns.lineplot(data=df, x="time", y="b2d", label="base to drone", errorbar=("sd", 2))
     sns.scatterplot(data=df, x="time", y="b2d", label="base to drone", s=1)
+    plt.ylim([-30, 10])    
+    
+    
     plt.grid(True)
     plt.show()
     
