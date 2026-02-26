@@ -93,7 +93,7 @@ class Ground_station:
         """
 
         
-        return 1#np.abs((np.cos(angle[0]/2)**10)) *np.abs((np.cos(angle[1]/2)**10))+ 0.05 #ah yes, direktionel antenna
+        return np.abs((np.cos(angle[0]/2)**10)) *np.abs((np.cos(angle[1]/2)**10))+ 0.05 #ah yes, direktionel antenna
     
 
     def probe_direction(self, 

@@ -7,8 +7,9 @@ from dash.dependencies import Input, Output
 import time
 import pandas as pd
 import dash_cytoscape as cyto
+import numpy.typing as npt
 
-
+from numpy.dtypes import StrDType
 import matplotlib.pyplot as plt
 
 import seaborn as sns
@@ -17,7 +18,8 @@ from drone import Drone
 from jammer import Jammer
 from ground_station import Ground_station
 
-
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from tqdm import tqdm
 
 class simulation:
 
@@ -89,19 +91,21 @@ class simulation:
 
 
     def update_positions(self, t):
-        for drone in drones:
+        for drone in self.drones:
             drone.propagate_position(t)
         
     def render_units(self, fig: go.Figure):
-        for drone in drones:
+        for drone in self.drones:
             fig.add_traces(drone.render())
 
         for ground_station in ground_stations:
             fig.add_traces(ground_station.render())
         
-        for jammer in jammers:
+        for jammer in self.jammers:
             fig.add_traces(jammer.render())
-    
+
+
+
     def evaluate_links(self, noise_floor: float = -110) -> pd.DataFrame:
         p_n_floor = 10**(noise_floor/10)*0.001
         rssi = []
@@ -111,11 +115,11 @@ class simulation:
         coords = []
 
         # --- Drone → Drone ---
-        for drone_rx in drones:
-            for drone_tx in drones:
+        for drone_rx in self.drones:
+            for drone_tx in self.drones:
                 if id(drone_rx) == id(drone_tx):
                     continue  # skip self
-                p_s, p_n = drone_rx.probe_direction(drone_tx, jammers)
+                p_s, p_n = drone_rx.probe_direction(drone_tx, self.jammers)
                 rssi.append(p_s + p_n)
                 snr.append(p_s / p_n)
                 rx.append(drone_rx.name)
@@ -124,9 +128,9 @@ class simulation:
 
 
         # --- Drone → Ground Station ---
-        for drone in drones:
-            for gs in ground_stations:
-                p_s, p_n = drone.probe_direction(gs, jammers)
+        for drone in self.drones:
+            for gs in self.ground_stations:
+                p_s, p_n = drone.probe_direction(gs, self.jammers)
                 p_n += p_n_floor
                 rssi.append(p_s + p_n)
                 snr.append(p_s / p_n)
@@ -135,9 +139,9 @@ class simulation:
                 coords.append(gs.get_position())
 
         # --- Ground Station → Drone ---
-        for gs in ground_stations:
-            for drone in drones:
-                p_s, p_n = gs.probe_direction(drone, jammers)
+        for gs in self.ground_stations:
+            for drone in self.drones:
+                p_s, p_n = gs.probe_direction(drone, self.jammers)
                 p_n += p_n_floor
                 rssi.append(p_s + p_n)
                 snr.append(p_s / p_n)
@@ -233,27 +237,25 @@ def handle_path_coords(links, path):
         z.append(pos[2])
     return (x,y,z)
 
-drones = [ 
-    Drone("hans", "backfourth.csv"),
-    Drone("holger", "happy_path.csv"),
-    Drone("bongers", "happy_path2.csv"),
-    Drone("poul", "left2right.csv")
-]
-
-jammers = [
-    #Jammer("Vlad",          np.array(([20, -10, 0.5]))),
-    Jammer("Stanislav",     np.array(([0,  1800, 2])), 27)
-    #Jammer("J.D. Vance",    np.array(([20,  10, 0.5])))
-]
-
-ground_stations = [
-    #Ground_station("Poul",  np.array([-20, -10, 0.5])),
-    Ground_station("8700",  np.array([0,   0,   2]))
-    #Ground_station("pingo", np.array([-20,  10, 0.5]))
-]
-
-
-sim = simulation(drones, jammers, ground_stations)
+#drones = [ 
+#    Drone("hans", "backfourth.csv"),
+#    Drone("holger", "happy_path.csv"),
+#    Drone("bongers", "happy_path2.csv"),
+#    Drone("poul", "left2right.csv")
+#]
+#
+#jammers = [
+#    #Jammer("Vlad",          np.array(([20, -10, 0.5]))),
+#    Jammer("Stanislav",     np.array(([0,  1800, 2])), 27)
+#    #Jammer("J.D. Vance",    np.array(([20,  10, 0.5])))
+#]
+#
+#ground_stations = [
+#    #Ground_station("Poul",  np.array([-20, -10, 0.5])),
+#    Ground_station("8700",  np.array([0,   0,   2]))
+#    #Ground_station("pingo", np.array([-20,  10, 0.5]))
+#]
+#sim = simulation(drones, jammers, ground_stations)
 
 
 snr_list = []
@@ -448,68 +450,143 @@ def assign_random_pos(max_y, rng: np.random.Generator):
         2
     ])
 
+def assign_random_drone_pos(rng: np.random.Generator) -> npt.NDArray[np.floating]:
+    return np.array([
+            rng.uniform(-3000, 200),
+            rng.uniform(-2000, -800),
+            100
+        ])
+
+
+
+def simulate_run(run_no, seed):
+    rng_jammers = np.random.default_rng(seed + run_no)
+    rng_drones = np.random.default_rng(seed + run_no)
+
+    jammers = [
+        Jammer("0", assign_random_pos(-2000, rng_jammers), 27),
+        Jammer("1", assign_random_pos(-1800, rng_jammers), 10),
+        Jammer("2", assign_random_pos(-1800, rng_jammers), 10),
+        Jammer("3", assign_random_pos(-1800, rng_jammers), 10),
+        Jammer("4", assign_random_pos(-1800, rng_jammers), 10),
+    ]
+
+    drones = [
+        Drone("poul", "reference_path.csv"),
+        Drone("thorsten", assign_random_drone_pos(rng_drones))
+    ]
+
+    ground_stations = [
+        Ground_station("8700", np.array([0,0,2]))
+    ]
+
+    sim = simulation(drones, jammers, ground_stations)
+
+    timespan = np.linspace(0, 400, 200)
+
+    snrd2b = []
+    snrb2d = []
+    final_time = []
+
+    assisting_drone_pos = drones[1].get_position()
+    jammer_positions = np.array([j.get_position() for j in jammers])
+
+    for t in timespan:
+
+        sim.update_positions(t)
+        links = sim.evaluate_links()
+
+        direct = links["snr"][(links["tx"] == "poul") & (links["rx"] == "8700")].iloc[0]
+
+        snrd2b.append(10*np.log10(direct))
+
+        direct = links["snr"][(links["tx"] == "8700") & (links["rx"] == "poul")].iloc[0]
+
+        snrb2d.append(10*np.log10(direct))
+
+        final_time.append(t)
+
+    return snrd2b, snrb2d, final_time, assisting_drone_pos, jammer_positions
 
 
 
 if __name__ == "__main__":
     #app.run(debug=True)
-    rng = np.random.default_rng(1)
-    
-    runs = 300
+    rng_jammers = np.random.default_rng(1)
+    rng_drones = np.random.default_rng(1)
     snrd2b = []
     snrb2d = []
     final_time = []
-    for run in range(runs):
-        print(f"iterations: {run}/{runs}")
-        jammers = [
-            Jammer("0",     assign_random_pos(-2000, rng), 27),
-            Jammer("1",     assign_random_pos(-1800, rng), 10),
-            Jammer("2",     assign_random_pos(-1800, rng), 10),
-            Jammer("3",     assign_random_pos(-1800, rng), 10),
-            Jammer("4",     assign_random_pos(-1800, rng), 10),
 
+
+    runs = 20
+
+    results = []
+    with ProcessPoolExecutor(max_workers=None) as executor:
+
+        futures = [
+            executor.submit(simulate_run, run, 1)
+            for run in range(runs)
         ]
 
-
-        drones=[
-            Drone("poul", "reference_path.csv")
-        ]
-
-        ground_stations = [
-            Ground_station("8700", np.array([0,0,2]))
-        ]
-
-        sim = simulation(drones, jammers, ground_stations)
-
-
-        timespan = np.linspace(0, 400, 200)
+        for future in tqdm(as_completed(futures), total=runs, desc="Running sim"):
+            results.append(future.result())
 
 
 
-        for i, t in enumerate(timespan):
-            sim.update_positions(t)
-            links = sim.evaluate_links()
-            
-            snrb2d.append(10*np.log10(links["snr"][(links["tx"] == "8700") & (links["rx"] == "poul")].iloc[0]))
-            snrd2b.append(10*np.log10(links["snr"][(links["tx"] == "poul") & (links["rx"] == "8700")].iloc[0]))
-            final_time.append(t)
+    assisting_drone_log = np.zeros((runs, 3))
+    jammer_log = np.zeros((runs*5, 3))
+
+    snrd2b = []
+    snrb2d = []
+    final_time = []
+
+
+    for run, result in enumerate(results):
+
+        snrd2b.extend(result[0])
+        snrb2d.extend(result[1])
+        final_time.extend(result[2])
+
+        assisting_drone_log[run] = result[3]
+
+        for i in range(5):
+            jammer_log[run*5+i] = result[4][i]
+
 
     df = pd.DataFrame()
     df["time"] = final_time
     df["d2b"] = snrd2b
     df["b2d"] = snrb2d
-    df.to_csv("Isotropic_path.csv")
+    df.to_csv("Directional_2.csv")
+    
+    fig = plt.figure(figsize=(8,8))
+    ax = fig.add_subplot(111, projection='3d')
+
+    ax.set_xlabel("X (m)")
+    ax.set_ylabel("Y (m)")
+    ax.set_zlabel("Z (m)")
 
 
+    ax.scatter(*assisting_drone_log.T, label="Drones")
+    ax.scatter(*jammer_log.T, label="Jammers")
 
+    ax.set_xlabel("X (m)")
+    ax.set_ylabel("Y (m)")
+    ax.set_zlabel("Z (m)")
+
+    ax.set_box_aspect([1,1,1])
+
+    ax.legend()
+
+    plt.figure()
     sns.lineplot(data=df, x="time", y="d2b", label="drone to base", errorbar=("sd", 2))
     sns.scatterplot(data=df, x="time", y="d2b", label="drone to base", s=1)
 
     sns.lineplot(data=df, x="time", y="b2d", label="base to drone", errorbar=("sd", 2))
     sns.scatterplot(data=df, x="time", y="b2d", label="base to drone", s=1)
     plt.ylim([-30, 10])    
-    
-    
+
+
     plt.grid(True)
     plt.show()
-    

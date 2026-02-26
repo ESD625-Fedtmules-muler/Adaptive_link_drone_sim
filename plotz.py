@@ -144,6 +144,7 @@ if __name__ == "__main__":
     axes[1,1].set_xlim(-30, 10)
     axes[1,1].set_ylim(0, 10)
     
+    
 
     
     axes[0,0].grid(True)
@@ -156,5 +157,15 @@ if __name__ == "__main__":
     axes[1,1].grid(True)
 
     plt.ylabel("Time [s]")
+    print("Isotropic: ")
+    print(f"\t drone2base: mu={np.mean(df_iso["d2b"])}, sd={np.std(df_iso["d2b"])}")
+    print(f"\t base2drone: mu={np.mean(df_iso["b2d"])}, sd={np.std(df_iso["b2d"])}")
+
+
+    print("Directional: ")
+    print(f"\t drone2base: mu={np.mean(df_dir["d2b"])}, sd={np.std(df_dir["d2b"])}")
+    print(f"\t base2drone: mu={np.mean(df_dir["b2d"])}, sd={np.std(df_dir["b2d"])}")
+
+    
 
     plt.show()

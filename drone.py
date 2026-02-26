@@ -17,11 +17,18 @@ if TYPE_CHECKING:
 
 
 class Drone:
-    def __init__(self, name: str, filename: str, loop=True):
+    def __init__(self, name: str, filename: str | npt.NDArray[np.floating], loop=True):
         self.name = name
         self.path_foler = "./paths/"
         self.loop = loop #if the path just should repeat itself.
-        self.t_lookup, self.pos_lookup = self._parse_path(filename) ##Konstruere vores lister med
+
+        if type(filename) is str:
+            self.t_lookup, self.pos_lookup = self._parse_path(filename) ##Konstruere vores lister med
+        else:
+            self.t_lookup = None
+            self.pos_lookup = filename
+
+        
         self.colour = "red"
         self.antenna_direction = npt.NDArray[np.floating]
         self.pos = np.array([0,0,0])
@@ -93,10 +100,14 @@ class Drone:
         :rtype: float
         """
         
-        return 1#(np.cos(angle[0]/2)**10)* (np.cos(angle[1]/2)**10) + 0.05#ah yes, direktionel antenna
+        return (np.cos(angle[0]/2)**10)* (np.cos(angle[1]/2)**10) + 0.05#ah yes, direktionel antenna
 
 
     def propagate_position(self, t) -> npt.NDArray[np.floating]:
+        if (self.t_lookup is None): ##hvis ik der reffet en fil men blot en vektor fra start
+            self.pos = self.pos_lookup #Tag den pos vi er givet
+            return self.pos ##For compatibily
+
         if self.loop: #if we need to loop around
             t = t % np.max(self.t_lookup)
             idx_1 = np.searchsorted(self.t_lookup, t, side="right") - 1
@@ -130,6 +141,8 @@ class Drone:
 
 
     def get_direction(self):
+        if self.t_lookup is None: ##Hvis det er en stationær drone.
+            return np.array([1,0,0])
         direction_vector = self.pos - self.lastpos
         if np.linalg.norm(direction_vector) < 0.001:
             return np.array([1,0,0]) #Så lille retning ikke giver mening
